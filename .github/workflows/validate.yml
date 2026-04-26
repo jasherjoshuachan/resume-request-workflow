@@ -1,0 +1,17 @@
+name: Validate Workflow JSON
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate workflow.json
+        run: python3 -c "import json,sys; json.load(open('workflow.json')) and print('workflow.json is valid JSON')"
+      - name: Check required fields
+        run: python3 -c "import json; wf=json.load(open('workflow.json')); [__import__('sys').exit(1) for k in ['name','nodes','connections'] if k not in wf]; print(f\"Workflow: {wf['name']} | Nodes: {len(wf['nodes'])}\")"

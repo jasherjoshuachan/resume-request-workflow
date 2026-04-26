@@ -1,0 +1,122 @@
+{
+  "name": "Portfolio — Resume Request",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resume-request",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "{{ YOUR_NOTION_DB_ID }}",
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "email:equals",
+              "emailValue": "={{ $json.body.email }}"
+            }
+          ]
+        },
+        "options": { "limit": 1 }
+      },
+      "id": "notion-search",
+      "name": "Notion: Check Duplicate",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": { "notionApi": { "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID", "name": "Notion account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $items().length }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-new",
+      "name": "IF: New Submission?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@truehubsolutions.com",
+        "toEmail": "={{ $('Webhook').item.json.body.email }}",
+        "subject": "Here's Jasher's Resume — Let's Connect",
+        "emailType": "html",
+        "message": "<p>Hi {{ $('Webhook').item.json.body.name }},</p><p>Thanks for reaching out! You can download my resume here: <a href='{{ YOUR_RESUME_PDF_URL }}'>Download Resume (PDF)</a></p><p>If you'd like to chat, you can book a 30-minute call: <a href='{{ YOUR_CAL_URL }}'>Schedule a Call</a></p><p>Looking forward to connecting.</p><p>— Jasher</p>",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Resend: Send Resume",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [900, 200],
+      "credentials": { "smtp": { "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID", "name": "Resend SMTP" } }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "{{ YOUR_NOTION_DB_ID }}",
+        "title": "={{ $('Webhook').item.json.body.name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Email|email", "emailValue": "={{ $('Webhook').item.json.body.email }}" },
+            { "key": "Source|select", "selectValue": "Portfolio Form" },
+            { "key": "Message|rich_text", "textContent": "={{ $('Webhook').item.json.body.message }}" }
+          ]
+        }
+      },
+      "id": "notion-create",
+      "name": "Notion: Log Lead",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [900, 380],
+      "credentials": { "notionApi": { "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID", "name": "Notion account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"ok\"}"
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Notion: Check Duplicate", "type": "main", "index": 0 }]] },
+    "Notion: Check Duplicate": { "main": [[{ "node": "IF: New Submission?", "type": "main", "index": 0 }]] },
+    "IF: New Submission?": {
+      "main": [
+        [{ "node": "Resend: Send Resume", "type": "main", "index": 0 }, { "node": "Notion: Log Lead", "type": "main", "index": 0 }],
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resend: Send Resume": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Notion: Log Lead": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_note": "Sanitized export — all credential IDs replaced with placeholders. Re-wire your own Notion and Resend credentials before activating."
+}
